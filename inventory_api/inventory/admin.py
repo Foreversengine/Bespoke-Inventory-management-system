@@ -1,3 +1,4 @@
 from django.contrib import admin
+from .models import Category, Product, Variant, Sale, InventoryAlert
 
-# Register your models here.
+admin.site.register([Category, Product, Variant, Sale, InventoryAlert])

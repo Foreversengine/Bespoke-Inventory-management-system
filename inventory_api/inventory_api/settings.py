@@ -2,18 +2,30 @@ import os
 from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
-import os
 
+# Load environment variables
+load_dotenv(Path(__file__).resolve().parent / '.env')
 
-# Build paths
+# Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Security (Update for production!)
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-dev-key-here')  # Always use env var in prod
-DEBUG = os.getenv('DEBUG', 'False') == 'True'  # False in production
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost 127.0.0.1').split()  # Add your domain in prod
+# ======================== CORE SETTINGS ========================
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key')
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ROOT_URLCONF = 'inventory_api.urls'
+WSGI_APPLICATION = 'inventory_api.wsgi.application'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Apps
+# ======================== SECURITY ========================
+if not DEBUG:
+    SECURE_HSTS_SECONDS = 3600
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# ======================== APPLICATIONS ========================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -21,22 +33,22 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'inventory',
     
     # Third-party
     'rest_framework',
     'rest_framework_simplejwt',
-    'corsheaders',  # For frontend API access
+    'corsheaders',
     
     # Local
-    'inventory.apps.InventoryConfig',  # Your app
+    'inventory',
 ]
 
-# Middleware
+# ======================== MIDDLEWARE ========================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS before other middleware
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -44,46 +56,85 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# DRF Configuration
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-
-    )
-}
-
-# JWT Settings (customize as needed)
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': True,
-}
-
-# CORS (adjust for your frontend in production)
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # React/Vue dev server
-    "http://127.0.0.1:3000",
+# ======================== TEMPLATES ========================
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
 ]
 
-# Database (PostgreSQL recommended for production)
-
-load_dotenv()  # This loads the .env file
-
-
+# ======================== DATABASE ========================
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('inventory_db'),
-        'USER': os.getenv('inventory_user'),
-        'PASSWORD': os.getenv('Demerisation1$'),
-        'HOST': os.getenv('localhost'),
-        'PORT': os.getenv('5432'),
+        'NAME': 'bespoke_db',  # ← Lowercase
+        'USER': 'bespoke_user',
+        'PASSWORD': 'Demerisation1$',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # For production
+# ======================== AUTHENTICATION ========================
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    },
+    {
+        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    },
+]
 
-# Default primary key field type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# ======================== REST FRAMEWORK ========================
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',
+        'user': '1000/hour'
+    }
+}
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+}
+
+# ======================== CORS ========================
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# ======================== STATIC & MEDIA ========================
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# ======================== INTERNATIONALIZATION ========================
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True

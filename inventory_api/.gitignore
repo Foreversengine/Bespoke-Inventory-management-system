@@ -1,0 +1,110 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Django stuff
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Backup files
+*.bak
+*.backup
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Static files
+/staticfiles/
+/media/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# Python packaging
+*.egg
+*.egg-info
+dist/
+build/
+pip-wheel-metadata/
+
+# Celery
+celerybeat-schedule.*
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+
+# Database migrations (uncomment if you want to version control migrations)
+# /migrations/
+# !/migrations/__init__.py
+
+# Testing
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Pyenv
+.python-version
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace

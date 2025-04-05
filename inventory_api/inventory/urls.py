@@ -1,8 +1,9 @@
 # inventory/urls.py
 from rest_framework.routers import DefaultRouter
-from .views import InventoryItemViewSet
+from .views import SaleViewSet, OrderViewSet
 
 router = DefaultRouter()
-router.register(r'items', InventoryItemViewSet, basename='inventory-item')
+router.register(r'sales', SaleViewSet)
+router.register(r'orders', OrderViewSet)
 
 urlpatterns = router.urls
