@@ -1,3 +1,9 @@
 from django.test import TestCase
+from inventory.models import Order
 
-# Create your tests here.
+class OrderModelTest(TestCase):
+    def test_required_fields(self):
+        order = Order.objects.create(
+            # ... required fields ...
+        )
+        self.assertIsNotNone(order.created_at)

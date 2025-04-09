@@ -1,6 +1,10 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
+from django.conf import settings
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+from django.utils import timezone
 
 class Category(models.Model):
     """Product categories (e.g., Shoes, Shirts)"""
@@ -16,6 +20,7 @@ class Category(models.Model):
 class Product(models.Model):
     """Base products with category and price"""
     name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
     category = models.ForeignKey(
         Category,
         on_delete=models.PROTECT,
@@ -26,12 +31,22 @@ class Product(models.Model):
         decimal_places=2,
         validators=[MinValueValidator(0.01)]
     )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='products'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     def __str__(self):
         return f"{self.name} ({self.category})"
 
     class Meta:
         ordering = ['name']
+        permissions = [
+            ("low_stock_alerts", "Can view low stock alerts"),
+        ]
 
 class Variant(models.Model):
     """Product variants with size/color options"""
@@ -46,6 +61,12 @@ class Variant(models.Model):
     stock_quantity = models.IntegerField(default=0)
     reorder_threshold = models.IntegerField(default=5)
     sku = models.CharField(max_length=50, unique=True, editable=False)
+    last_updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
 
     def clean(self):
         """Validate stock and threshold values"""
@@ -66,12 +87,40 @@ class Variant(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    @property
+    def is_low_stock(self):
+        return self.stock_quantity < self.reorder_threshold
+
     def __str__(self):
         return f"{self.variant_name} ({self.sku})"
 
     class Meta:
         unique_together = [['product', 'variant_name']]
         ordering = ['product__name', 'variant_name']
+
+class InventoryAudit(models.Model):
+    """Tracks all inventory changes"""
+    variant = models.ForeignKey(
+        Variant,
+        on_delete=models.CASCADE,
+        related_name='audit_logs'
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True
+    )
+    old_quantity = models.IntegerField()
+    new_quantity = models.IntegerField()
+    timestamp = models.DateTimeField(auto_now_add=True)
+    change_reason = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = "Inventory Change Log"
+
+    def __str__(self):
+        return f"{self.variant.sku} changed by {self.user}"
 
 class Sale(models.Model):
     """Track sales transactions"""
@@ -87,11 +136,18 @@ class Sale(models.Model):
         decimal_places=2,
         editable=False
     )
+    sold_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT
+    )
 
     def save(self, *args, **kwargs):
         """Auto-calculate total price"""
         self.total_price = self.variant.product.price * self.quantity_sold
         super().save(*args, **kwargs)
+        # Update stock
+        self.variant.stock_quantity -= self.quantity_sold
+        self.variant.save()
 
     def __str__(self):
         return f"Sale #{self.id} - {self.variant.sku}"
@@ -101,6 +157,13 @@ class Sale(models.Model):
 
 class Order(models.Model):
     """Bespoke/custom orders"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled')
+    ]
+    
     product = models.ForeignKey(
         Product,
         on_delete=models.PROTECT,
@@ -110,13 +173,13 @@ class Order(models.Model):
     design_specs = models.TextField()
     status = models.CharField(
         max_length=20,
-        choices=[
-            ('pending', 'Pending'),
-            ('in_progress', 'In Progress'),
-            ('completed', 'Completed'),
-            ('cancelled', 'Cancelled')
-        ],
+        choices=STATUS_CHOICES,
         default='pending'
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='orders_created'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -127,20 +190,15 @@ class Order(models.Model):
     class Meta:
         ordering = ['-created_at']
 
-class InventoryAlert(models.Model):
-    """Low stock notifications"""
-    variant = models.ForeignKey(
-        Variant,
-        on_delete=models.CASCADE,
-        related_name='alerts'
-    )
-    alert_message = models.TextField()
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_resolved = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"Alert for {self.variant.sku}"
-
-    class Meta:
-        ordering = ['-created_at']
-        verbose_name = "Stock Alert"
+@receiver(pre_save, sender=Variant)
+def track_inventory_change(sender, instance, **kwargs):
+    if instance.pk:  # Only for updates
+        old = Variant.objects.get(pk=instance.pk)
+        if old.stock_quantity != instance.stock_quantity:
+            InventoryAudit.objects.create(
+                variant=instance,
+                user=instance.last_updated_by,
+                old_quantity=old.stock_quantity,
+                new_quantity=instance.stock_quantity,
+                change_reason="Manual adjustment" if not instance.sales.exists() else "Sale"
+            )

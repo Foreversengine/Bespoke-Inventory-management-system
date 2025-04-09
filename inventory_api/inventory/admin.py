@@ -1,4 +1,6 @@
 from django.contrib import admin
-from .models import Category, Product, Variant, Sale, InventoryAlert
+from .models import *
 
-admin.site.register([Category, Product, Variant, Sale, InventoryAlert])
+@admin.register(Category, Product, Variant, Sale, Order, InventoryAudit)
+class InventoryAdmin(admin.ModelAdmin):
+    pass
