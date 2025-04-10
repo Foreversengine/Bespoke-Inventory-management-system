@@ -5,10 +5,16 @@ from django.conf import settings
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.utils import timezone
+from django.db.models import Count
+from django.contrib.auth.models import User
 
+class CategoryManager(models.Manager):
+    def with_product_counts(self):
+        return self.annotate(product_count=Count('products'))
 class Category(models.Model):
     """Product categories (e.g., Shoes, Shirts)"""
     name = models.CharField(max_length=50, unique=True)
+    objects = CategoryManager()  # Add this line
     
     def __str__(self):
         return self.name
@@ -16,6 +22,7 @@ class Category(models.Model):
     class Meta:
         verbose_name_plural = "Categories"
         ordering = ['name']
+
 
 class Product(models.Model):
     """Base products with category and price"""
@@ -32,7 +39,7 @@ class Product(models.Model):
         validators=[MinValueValidator(0.01)]
     )
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name='products'
     )
